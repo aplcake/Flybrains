@@ -1,25 +1,7 @@
 (() => {
-  // web/popup-wallet.mjs
-  var wallets = /* @__PURE__ */ new Map();
-  window.addEventListener("eip6963:announceProvider", (e) => {
-    const d = e.detail;
-    if (d?.info?.uuid && typeof d.provider?.request === "function" && !wallets.has(d.info.uuid)) wallets.set(d.info.uuid, d);
-  });
-  window.dispatchEvent(new Event("eip6963:requestProvider"));
-  function availableWallets() {
-    window.dispatchEvent(new Event("eip6963:requestProvider"));
-    const list = [...wallets.values()];
-    if (!list.length && typeof window.ethereum?.request === "function") list.push({ info: { name: "Browser wallet" }, provider: window.ethereum });
-    return list;
-  }
-  function requestConnection(provider2) {
-    return provider2.request({ method: "eth_requestAccounts" });
-  }
-
   // web/community-entry.js
   var $ = (id) => document.getElementById(id);
   var status = (t) => $("status").textContent = t;
-  var provider;
   var account = "";
   var points = 0;
   var pair = null;
@@ -27,9 +9,6 @@
   var revision = 0;
   var currentScreen = "connect";
   var busy = false;
-  var connecting = false;
-  var detach = () => {
-  };
   async function api(path, data) {
     const r = await fetch((location.pathname.startsWith("/web/") ? "/api/community/" : "/api/") + path, data ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) } : {});
     const v = await r.json();
@@ -75,7 +54,6 @@
     $("first-vote").hidden = true;
     clearMedia();
     $("leaders").replaceChildren();
-    $("wallet-dialog").close();
     screen("connect");
     status("");
     $("identity").textContent = "";
@@ -197,53 +175,23 @@
       if (rev === revision) status(e.message);
     }
   }
-  async function connect(wallet) {
-    if (connecting) return;
-    connecting = true;
-    $("connect").disabled = true;
-    $("wallet-dialog").close();
-    status("Approve the connection in your wallet popup.");
-    try {
-      detach();
-      provider = wallet.provider;
-      const current = provider, onAccounts = (a) => {
-        if (current === provider) switchAccount(a).catch((e) => status(e.message));
-      }, onDisconnect = () => {
-        if (current === provider) switchAccount([]);
-      };
-      provider.on?.("accountsChanged", onAccounts);
-      provider.on?.("disconnect", onDisconnect);
-      detach = () => {
-        current.removeListener?.("accountsChanged", onAccounts);
-        current.removeListener?.("disconnect", onDisconnect);
-      };
-      const accounts = await requestConnection(current);
-      if (current === provider) await switchAccount(accounts);
-    } catch (e) {
-      status(e.code === 4001 ? "Connection cancelled. Try again whenever you\u2019re ready." : e.code === -32002 ? "A connection request is already open. Check your wallet extension." : e.message || "Unable to connect.");
-    } finally {
-      connecting = false;
-      $("connect").disabled = false;
-    }
-  }
-  $("connect").onclick = () => {
-    const wallets2 = availableWallets();
-    if (wallets2.length === 1) {
-      connect(wallets2[0]);
+  $("address-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const field = $("address"), value = field.value.trim();
+    if (!/^0x[a-fA-F0-9]{40}$/.test(value) || /^0x0{40}$/i.test(value)) {
+      field.setCustomValidity("Enter a public Ethereum address: 0x followed by 40 hexadecimal characters.");
+      field.reportValidity();
       return;
     }
-    const list = $("wallet-list");
-    list.replaceChildren();
-    $("wallet-help").textContent = wallets2.length ? "Choose the wallet whose connection popup you want to open." : "No browser wallet detected. Install a browser wallet, or open this site inside your mobile wallet\u2019s browser, then try again.";
-    for (const wallet of wallets2) {
-      const button = document.createElement("button");
-      button.textContent = wallet.info.name || "Browser wallet";
-      button.onclick = () => connect(wallet);
-      list.append(button);
+    field.setCustomValidity("");
+    $("connect").disabled = true;
+    try {
+      await switchAccount([value]);
+    } finally {
+      $("connect").disabled = false;
     }
-    $("wallet-dialog").showModal();
   };
-  $("wallet-close").onclick = () => $("wallet-dialog").close();
+  $("address").oninput = () => $("address").setCustomValidity("");
   $("nickname-form").onsubmit = async (e) => {
     e.preventDefault();
     if (!account) return;
@@ -277,9 +225,8 @@
     status("");
   };
   $("disconnect").onclick = async () => {
-    detach();
-    provider = null;
     await switchAccount([]);
+    $("address").value = "";
   };
   for (const id of ["welcome-start", "back-to-curation"]) $(id).onclick = () => {
     screen("site");

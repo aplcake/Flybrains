@@ -30,9 +30,9 @@ PRAGMA user_version=1;
 ''')
 
 class HostedCommunity:
-    def __init__(self,storage,admin_token,origins=(),project_id=''):
+    def __init__(self,storage,admin_token,origins=()):
         if len(admin_token)<32 or admin_token.startswith('REPLACE_'):raise ValueError('Set a private random admin token with at least 32 characters')
-        self.storage=storage;self.token=admin_token;self.origins=set(origins);self.project_id=project_id;migrate()
+        self.storage=storage;self.token=admin_token;self.origins=set(origins);migrate()
     def stage(self,d):
         if set(d)!={'version','count','dataset','scope','rendererHash','profileHash','contentRoot','manifest'} or d['version']!=1:raise ValueError('Invalid batch descriptor')
         if type(d['count']) is not int or not 2<=d['count']<=100000:raise ValueError('Batch count must be 2..100000')
@@ -127,7 +127,7 @@ class HostedCommunity:
     def status(self):
         with core.database() as c:return {r[0]:r[1] or None for r in c.execute('SELECT key,value FROM config WHERE key IN ("active","previous")')}
     def dispatch(self,path,v):
-        if path=='/api/config':return {'projectId':self.project_id}
+        if path=='/api/config':return {'identityMode':'public-address','walletConnection':False}
         if path=='/api/health':
             with core.database() as c:c.execute('SELECT 1')
             return {'ok':True,'storage':'sqlite-single-instance'}
@@ -184,7 +184,7 @@ def main():
     mount=os.environ.get('RAILWAY_VOLUME_MOUNT_PATH')
     if not mount and os.environ.get('ALLOW_LOCAL_STORAGE')!='1':raise RuntimeError('Attach the Railway persistent volume; local testing requires explicit ALLOW_LOCAL_STORAGE=1')
     if mount and not core.DB.resolve().is_relative_to(Path(mount).resolve()):raise RuntimeError('Database must be inside the Railway volume mount')
-    app=HostedCommunity(S3Storage(),os.environ['ARTIST_ADMIN_TOKEN'],os.environ['ALLOWED_ORIGINS'].split(','),os.environ.get('REOWN_PROJECT_ID',''))
+    app=HostedCommunity(S3Storage(),os.environ['ARTIST_ADMIN_TOKEN'],os.environ['ALLOWED_ORIGINS'].split(','))
     threading.Thread(target=core.expire_loop,daemon=True).start()
     serve(app,host=os.environ.get('HOST','0.0.0.0'),port=int(os.environ.get('PORT','8080')),threads=8,max_request_body_size=2_000_000,channel_timeout=45,expose_tracebacks=False)
 
