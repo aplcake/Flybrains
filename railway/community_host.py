@@ -31,7 +31,7 @@ PRAGMA user_version=1;
 
 class HostedCommunity:
     def __init__(self,storage,admin_token,origins=(),project_id=''):
-        if len(admin_token)<32:raise ValueError('Admin token must have at least 32 characters')
+        if len(admin_token)<32 or admin_token.startswith('REPLACE_'):raise ValueError('Set a private random admin token with at least 32 characters')
         self.storage=storage;self.token=admin_token;self.origins=set(origins);self.project_id=project_id;migrate()
     def stage(self,d):
         if set(d)!={'version','count','dataset','scope','rendererHash','profileHash','contentRoot','manifest'} or d['version']!=1:raise ValueError('Invalid batch descriptor')
@@ -132,7 +132,10 @@ class HostedCommunity:
             with core.database() as c:c.execute('SELECT 1')
             return {'ok':True,'storage':'sqlite-single-instance'}
         if path=='/api/leaderboard':return core.leaderboard()
-        if path=='/api/account':return core.account(v['address'],v.get('nickname'))
+        if path=='/api/account':
+            if 'nickname' in v and (not isinstance(v['nickname'],str) or not v['nickname'].strip()):raise ValueError('Choose a nickname to continue')
+            return core.account(v['address'],v.get('nickname'))
+        if path in ['/api/pair','/api/vote'] and not core.account(v['address'])['nickname'].strip():raise ValueError('Choose a nickname before curating')
         if path=='/api/vote':return core.vote(v)
         if path=='/api/pair':
             pair=core.serve_pair(v['address'])

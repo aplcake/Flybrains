@@ -1,0 +1,14 @@
+{
+  "dataset": "male-cns:v1.0",
+  "scope": "brain",
+  "sourceHash": "0afed8d8cb9af7d6bbcc44d43a008094c68a52969beff59ead1c5f29dca4b976",
+  "neurons": 4096,
+  "eligible": 140486,
+  "points": 65502,
+  "bytes": 406691,
+  "sha256": "02c5f5fbbd7a0589b73abfe497b4778aa806c7756a55b17bdf97f4281d844c58",
+  "sampling": "Up to 16 original nodes per imported neuron. Viewing sample, not a complete skeleton or full brain.",
+  "syntheticNodes": 0,
+  "license": "CC-BY-4.0",
+  "notice": "Male CNS v1.0: FlyEM Project Team, HHMI Janelia; Cambridge Drosophila Connectomics Group / MRC Laboratory of Molecular Biology; Google Research. CC BY 4.0. Source: https://male-cns.janelia.org/download/ . License: https://creativecommons.org/licenses/by/4.0/ . Publication: https://www.cell.com/cell/fulltext/S0092-8674(26)00942-6 . Modifications: annotated neuron selection, display normalization, render simplification and synthetic artistic activity/geometry. No endorsement; not recorded neural activity."
+}

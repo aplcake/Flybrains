@@ -32,7 +32,7 @@ def account(value,nickname=None):
   if nickname is not None:
    if not isinstance(nickname,str) or len(nickname)>32:raise ValueError('Nickname must be at most 32 characters')
    c.execute('UPDATE accounts SET nickname=? WHERE address=?',(nickname.strip(),a))
-  r=c.execute('SELECT * FROM accounts WHERE address=?',(a,)).fetchone();return {'display':r['nickname'] or a[:5]+'…'+a[-4:],'points':r['points']}
+  r=c.execute('SELECT * FROM accounts WHERE address=?',(a,)).fetchone();return {'display':r['nickname'] or a[:5]+'…'+a[-4:],'nickname':r['nickname'],'points':r['points']}
 def import_batch(manifest):
  m=json.loads(Path(manifest).read_text(encoding='utf-8'));raw=json.dumps(m,sort_keys=True,separators=(',',':'));bid=hashlib.sha256(raw.encode()).hexdigest()[:20]
  with database() as c:
