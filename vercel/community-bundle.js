@@ -2,6 +2,26 @@
   // web/community-entry.js
   var $ = (id) => document.getElementById(id);
   var status = (t) => $("status").textContent = t;
+  var rememberedKey = "flybrains.rememberedAddress.v1";
+  var validAddress = (a) => typeof a === "string" && /^0x[a-fA-F0-9]{40}$/.test(a) && !/^0x0{40}$/i.test(a);
+  function rememberAddress(a) {
+    try {
+      if (a) localStorage.setItem(rememberedKey, a.toLowerCase());
+      else localStorage.removeItem(rememberedKey);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function rememberedAddress() {
+    try {
+      const a = localStorage.getItem(rememberedKey);
+      if (validAddress(a)) return a.toLowerCase();
+      if (a) localStorage.removeItem(rememberedKey);
+    } catch {
+    }
+    return "";
+  }
   var account = "";
   var points = 0;
   var pair = null;
@@ -196,6 +216,7 @@
     $("connect").disabled = true;
     try {
       await switchAccount([value]);
+      if (account === value.toLowerCase() && !rememberAddress($("remember-address").checked ? account : "")) status("You can continue, but this browser could not remember your address.");
     } finally {
       $("connect").disabled = false;
     }
@@ -234,8 +255,14 @@
     status("");
   };
   $("disconnect").onclick = async () => {
+    const cleared = rememberAddress("");
     await switchAccount([]);
     $("address").value = "";
+    $("address").focus();
+    if (!cleared) status("This browser could not clear the saved address. Clear this site\u2019s browser data to forget it.");
+  };
+  $("remember-address").onchange = () => {
+    if (!$("remember-address").checked) rememberAddress("");
   };
   for (const id of ["welcome-start", "back-to-curation"]) $(id).onclick = () => {
     screen("site");
@@ -300,4 +327,18 @@
       if (a === account) $("suggestion-save").disabled = false;
     }
   };
+  var remembered = rememberedAddress();
+  if (remembered) {
+    $("address").value = remembered;
+    $("connect").disabled = true;
+    switchAccount([remembered]).finally(() => {
+      $("connect").disabled = false;
+    });
+  }
+  addEventListener("storage", (e) => {
+    if (e.key === rememberedKey && !e.newValue) {
+      switchAccount([]);
+      $("address").value = "";
+    }
+  });
 })();
