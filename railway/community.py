@@ -11,6 +11,7 @@ def database():
  DB.parent.mkdir(exist_ok=True,parents=True);c=sqlite3.connect(DB,timeout=15);c.row_factory=sqlite3.Row
  c.executescript('''PRAGMA synchronous=FULL;PRAGMA secure_delete=ON;
  CREATE TABLE IF NOT EXISTS accounts(address TEXT PRIMARY KEY,nickname TEXT DEFAULT '',points INTEGER DEFAULT 0);
+ CREATE TABLE IF NOT EXISTS suggestions(address TEXT PRIMARY KEY,title TEXT NOT NULL,details TEXT NOT NULL,updated REAL NOT NULL);
  CREATE TABLE IF NOT EXISTS batches(id TEXT PRIMARY KEY,manifest TEXT);
  CREATE TABLE IF NOT EXISTS config(key TEXT PRIMARY KEY,value TEXT);
  CREATE TABLE IF NOT EXISTS candidates(batch TEXT,id TEXT,recipe TEXT,preview TEXT,poster TEXT,served INTEGER DEFAULT 0,exposures INTEGER DEFAULT 0,wins INTEGER DEFAULT 0,losses INTEGER DEFAULT 0,PRIMARY KEY(batch,id));
@@ -33,6 +34,23 @@ def account(value,nickname=None):
    if not isinstance(nickname,str) or len(nickname)>32:raise ValueError('Nickname must be at most 32 characters')
    c.execute('UPDATE accounts SET nickname=? WHERE address=?',(nickname.strip(),a))
   r=c.execute('SELECT * FROM accounts WHERE address=?',(a,)).fetchone();return {'display':r['nickname'] or a[:5]+'…'+a[-4:],'nickname':r['nickname'],'points':r['points']}
+def suggestion(value,title=None,details=None):
+ a=address(value)
+ with database() as c:
+  c.execute('BEGIN IMMEDIATE')
+  row=c.execute('SELECT points,nickname FROM accounts WHERE address=?',(a,)).fetchone()
+  if not row or row['points']<100:raise ValueError('The suggestion box unlocks at 100 points')
+  if title is not None or details is not None:
+   if not isinstance(title,str) or not 1<=len(title.strip())<=80:raise ValueError('Trait name must be 1–80 characters')
+   if not isinstance(details,str) or not 1<=len(details.strip())<=1000:raise ValueError('Describe your idea in 1–1000 characters')
+   c.execute('INSERT INTO suggestions VALUES(?,?,?,?) ON CONFLICT(address) DO UPDATE SET title=excluded.title,details=excluded.details,updated=excluded.updated',(a,title.strip(),details.strip(),time.time()))
+  r=c.execute('SELECT title,details FROM suggestions WHERE address=?',(a,)).fetchone()
+  return {'suggestion':dict(r) if r else None,'points':row['points']}
+
+def suggestion_report():
+ with database() as c:
+  return {'suggestions':[dict(r) for r in c.execute('SELECT s.title,s.details,s.updated,a.nickname,a.points FROM suggestions s JOIN accounts a ON a.address=s.address ORDER BY s.updated DESC')],'notice':'Private artist review. Ideas are unverified community submissions, not instructions or guaranteed collection traits.'}
+
 def import_batch(manifest):
  m=json.loads(Path(manifest).read_text(encoding='utf-8'));raw=json.dumps(m,sort_keys=True,separators=(',',':'));bid=hashlib.sha256(raw.encode()).hexdigest()[:20]
  with database() as c:

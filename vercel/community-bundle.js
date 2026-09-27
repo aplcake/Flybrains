@@ -18,7 +18,13 @@
   function enabled(v) {
     $("left").disabled = $("right").disabled = !v;
   }
+  function suggestionGate() {
+    const b = $("suggestion-open");
+    b.disabled = points < 100;
+    b.textContent = points < 100 ? `Suggestion box \xB7 ${points}/100` : "Suggest a trait \u2197";
+  }
   function screen(name) {
+    suggestionGate();
     currentScreen = name;
     for (const k of ["connect", "nickname", "welcome"]) $(k + "-gate").hidden = name !== k;
     $("site").hidden = name !== "site";
@@ -45,6 +51,8 @@
     const next = (accounts[0] || "").toLowerCase();
     if (next === account) return;
     account = next;
+    $("suggestion-dialog").close();
+    $("suggestion-title").value = $("suggestion-details").value = "";
     const rev = ++revision;
     points = 0;
     pair = pending = null;
@@ -134,6 +142,7 @@
       if (rev !== revision || a !== account) return;
       const first = points === 0;
       points = result.points;
+      suggestionGate();
       $("points").textContent = String(points);
       pending = null;
       $("retry").hidden = true;
@@ -250,4 +259,45 @@
   };
   window.communityConnection = { onAccountsChanged: switchAccount };
   screen("connect");
+  var suggestionBusy = false;
+  $("suggestion-open").onclick = async () => {
+    if (points < 100 || !account) return;
+    const a = account;
+    $("suggestion-status").textContent = "Loading\u2026";
+    $("suggestion-save").disabled = true;
+    $("suggestion-dialog").showModal();
+    try {
+      const r = await api("suggestion", { address: a });
+      if (a !== account) return;
+      $("suggestion-title").value = r.suggestion?.title || "";
+      $("suggestion-details").value = r.suggestion?.details || "";
+      $("suggestion-status").textContent = "";
+      $("suggestion-save").disabled = false;
+    } catch (e) {
+      if (a === account) $("suggestion-status").textContent = e.message;
+    }
+  };
+  $("suggestion-close").onclick = () => $("suggestion-dialog").close();
+  $("suggestion-form").onsubmit = async (e) => {
+    e.preventDefault();
+    if (suggestionBusy || points < 100 || !account) return;
+    const a = account;
+    const title = $("suggestion-title").value.trim(), details = $("suggestion-details").value.trim();
+    if (!title || !details) {
+      $("suggestion-status").textContent = "Please add a name and description.";
+      return;
+    }
+    suggestionBusy = true;
+    $("suggestion-save").disabled = true;
+    $("suggestion-status").textContent = "Saving\u2026";
+    try {
+      await api("suggestion", { address: a, title, details });
+      if (a === account) $("suggestion-status").textContent = "Saved. Thanks for sharing your idea!";
+    } catch (e2) {
+      if (a === account) $("suggestion-status").textContent = "Not confirmed. Save again to retry safely. " + e2.message;
+    } finally {
+      suggestionBusy = false;
+      if (a === account) $("suggestion-save").disabled = false;
+    }
+  };
 })();

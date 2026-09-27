@@ -14,7 +14,7 @@ def check_hash(v):
 def migrate():
     if core.DB.exists():
         with closing(sqlite3.connect(core.DB)) as old:version=old.execute('PRAGMA user_version').fetchone()[0]
-        if version<1:
+        if version<2:
             from community_backup import backup
             backup(core.DB,core.DB.parent/('before-host-schema-'+str(time.time_ns())+'.sqlite'))
     with core.database() as c:
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS remote_members(batch TEXT,key TEXT,PRIMARY KEY(batch,
 CREATE TABLE IF NOT EXISTS activation_history(n INTEGER PRIMARY KEY,previous TEXT,current TEXT,created REAL);
 CREATE INDEX IF NOT EXISTS candidate_balance ON candidates(batch,served);
 CREATE INDEX IF NOT EXISTS receipt_expiry ON receipts(expires);
-PRAGMA user_version=1;
+PRAGMA user_version=2;
 ''')
 
 class HostedCommunity:
@@ -132,6 +132,8 @@ class HostedCommunity:
             with core.database() as c:c.execute('SELECT 1')
             return {'ok':True,'storage':'sqlite-single-instance'}
         if path=='/api/leaderboard':return core.leaderboard()
+        if path=='/api/suggestion':return core.suggestion(v['address'],v.get('title'),v.get('details'))
+        if path=='/admin/suggestions':return core.suggestion_report()
         if path=='/api/account':
             if 'nickname' in v and (not isinstance(v['nickname'],str) or not v['nickname'].strip()):raise ValueError('Choose a nickname to continue')
             return core.account(v['address'],v.get('nickname'))
